@@ -200,3 +200,23 @@ def estimate_good_probability(N, num_vertex, num_confounding):
         if is_good(G1,G2,B1,B2):
             count_true += 1
     return count_true / N
+
+def get_j(S, i):
+    return {j for x, j in S if x == i}
+
+def check_inclusion(G1,G2,B1,B2):
+    V = list(G1.nodes())
+    IG = induced_graph(V, B1, B2)
+    IG_cleaned = IG_clean_up(IG, G1, G2, B2)
+    unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
+    unremovable_neighbors = neighbors_of_set(IG_cleaned, unremovable)
+    if not is_vertex_cover(IG_cleaned.edges, unremovable_neighbors | unremovable):
+        return "Not tractable"
+    if IG_cleaned.subgraph(unremovable).number_of_edges() > 0:
+        return False
+    for i in V:
+        X = get_j(unremovable_neighbors,i)
+        Y = list(G2.predecessors(i))
+        if not path_rank(G1, X, Y + [i]) == path_rank(G1, X, Y):
+            return False
+    return True
