@@ -159,6 +159,45 @@ def plot_auxiliary(G1, G2, B1, B2):
     ax.margins(0.20)
     plt.show()
     return(is_vertex_cover(IG_cleaned.edges, unremovable_neighbors | unremovable))
+
+def st_plot_auxiliary(G1, G2, B1, B2):
+    V = list(G1.nodes())
+    IG = induced_graph(V, B1, B2)
+    IG_cleaned = IG_clean_up(IG, G1, G2, B2)
+    unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
+    unremovable_neighbors = neighbors_of_set(IG_cleaned, unremovable)
+    node_colors = [
+        "#d62728" if node in unremovable else
+        "#1f77b4" if node in unremovable_neighbors else
+        "white"
+        for node in IG_cleaned.nodes()
+    ]
+    options = {
+        "font_size": 6,
+        "node_size": 500,
+        "node_color": node_colors,
+        "edgecolors": "black",
+        "linewidths": 1,
+        "width": 1,
+    }
+    pos = {(i, j): (j, i) for i, j in IG_cleaned.nodes()}
+    fig, ax = plt.subplots()
+    nx.draw_networkx(
+        IG_cleaned,
+        pos,
+        arrows=True,
+        ax=ax,
+        **options,
+        connectionstyle="arc3,rad=0.2"
+    )
+    ax.invert_yaxis()
+    ax.margins(0.20)
+    plt.close(fig)
+    result = is_vertex_cover(
+        IG_cleaned.edges,
+        unremovable_neighbors | unremovable
+    )
+    return fig, result
     
 def random_dag(n, p=0.3, seed=None):
     if seed is not None:
