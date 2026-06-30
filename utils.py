@@ -224,10 +224,33 @@ def random_confounding(n, k, seed=None):
 def is_good(G1, G2, B1, B2):
     V = list(G1.nodes())
     IG = induced_graph(V, B1, B2)
-    IG_cleaned = IG_clean_up(IG, G1, G2, B2)
-    unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
-    unremovable_neighbors = neighbors_of_set(IG_cleaned, unremovable)
-    return(is_vertex_cover(IG_cleaned.edges, unremovable_neighbors | unremovable))
+    removable, unremovable = get_removable(V,G1,G2,B2)
+    remain = set(IG.nodes)-set(removable)
+    IG_re = IG.subgraph(remain).copy()
+    IG_re.remove_nodes_from(list(nx.isolates(IG_re)))
+    unremovable = unremovable & IG_re.nodes
+    unremovable_neighbors = neighbors_of_set(IG_re, unremovable)
+    return(is_vertex_cover(IG_re.edges, unremovable_neighbors | unremovable))
+
+def is_finished(G1, G2, B1, B2):
+    V = list(G1.nodes())
+    IG = induced_graph(V, B1, B2)
+    removable, unremovable = get_removable(V,G1,G2,B2)
+    remain = set(IG.nodes)-set(removable)
+    IG_re = IG.subgraph(remain).copy()
+    IG_re.remove_nodes_from(list(nx.isolates(IG_re)))
+    unremovable = unremovable & IG_re.nodes
+    unremovable_neighbors = neighbors_of_set(IG_re, unremovable)
+    if IG_re.subgraph(unremovable).number_of_edges() > 0:
+        return True
+    for i in V:
+        X = get_j(unremovable_neighbors,i)
+        Y = list(G2.predecessors(i))
+        if not path_rank(G1, X, Y + [i]) == path_rank(G1, X, Y):
+            return True
+    if is_vertex_cover(IG_re.edges, unremovable_neighbors | unremovable):
+        return True
+    return False
 
 def estimate_good_probability(N, num_vertex, num_confounding):
     count_true = 0
@@ -239,6 +262,15 @@ def estimate_good_probability(N, num_vertex, num_confounding):
         if is_good(G1,G2,B1,B2):
             count_true += 1
     return count_true / N
+
+def find_not_good_pair(N, num_vertex, num_confounding):
+    for _ in range(N):
+        G1 = random_dag(num_vertex,random.random())
+        B1 = random_confounding(num_vertex,num_confounding)
+        G2 = random_dag(num_vertex,random.random())
+        B2 = random_confounding(num_vertex,num_confounding)
+        if not is_finished(G1,G2,B1,B2):
+            return G1,G2,B1,B2
 
 def get_j(S, i):
     return {j for x, j in S if x == i}
@@ -258,4 +290,74 @@ def check_inclusion(G1,G2,B1,B2):
         Y = list(G2.predecessors(i))
         if not path_rank(G1, X, Y + [i]) == path_rank(G1, X, Y):
             return False
+    return True
+
+def powerset(s):
+    s = list(s)
+    n = len(s)
+    result = []
+    for i in range(1 << n):
+        subset = {s[j] for j in range(n) if (i & (1 << j))}
+        result.append(subset)
+    return result
+
+def remove_strict_supersets(P, S):
+    S = set(S)
+    result = []
+    for subset in P:
+        subset_set = set(subset)
+        if not (S < subset_set):
+            result.append(subset)
+    return result
+
+def inclusive_minimal_covers(IG_remain,P):
+    n = len(P)
+    k = 0
+    for _ in range(n):
+        if k == len(P):
+            break
+        if not is_vertex_cover(IG_remain.edges(),P[k]):
+            P.pop(k)
+        else:
+            P = remove_strict_supersets(P,P[k])
+            k = k+1
+    return P
+
+def check_inclusion_full(G1,G2,B1,B2):
+
+    if len(B1) != len(B2):
+        return False
+    
+    V = list(G1.nodes())
+    IG = induced_graph(V, B1, B2)
+    IG_cleaned = IG_clean_up(IG, G1, G2, B2)
+    unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
+    unremovable_neighbors = neighbors_of_set(IG_cleaned, unremovable)
+
+    if IG_cleaned.subgraph(unremovable).number_of_edges() > 0:
+        return False
+
+    for i in V:
+        X = get_j(unremovable_neighbors,i)
+        Y = list(G2.predecessors(i))
+        if not path_rank(G1, X, Y + [i]) == path_rank(G1, X, Y):
+            return False
+    
+    if is_vertex_cover(IG_cleaned.edges, unremovable_neighbors | unremovable):
+        return True
+
+    remain = IG_cleaned.nodes - unremovable - unremovable_neighbors
+    IG_remain = IG_cleaned.subgraph(remain).copy()
+    IG_remain.remove_nodes_from(list(nx.isolates(IG_remain)))
+
+    P = powerset(IG_remain.nodes())
+    covers = inclusive_minimal_covers(IG_remain,P)
+    
+    for cover in covers:
+        for i in V:
+            X = list(get_j(unremovable_neighbors,i)) + list(get_j(cover,i))
+            Y = list(G2.predecessors(i))
+            if path_rank(G1, X, Y + [i]) != path_rank(G1, X, Y):
+                return False
+
     return True
