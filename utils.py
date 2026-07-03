@@ -121,6 +121,7 @@ def get_removable(V, G1, G2, B2):
 
 def IG_clean_up(IG, G1, G2, B2):
     V = list(G1.nodes())
+    V.sort()
     remain = set(IG.nodes)-set(get_removable(V, G1, G2, B2)[0])
     IG_re = IG.subgraph(remain).copy()
     IG_re.remove_nodes_from(list(nx.isolates(IG_re)))
@@ -134,6 +135,7 @@ def neighbors_of_set(G, S):
 
 def plot_auxiliary(G1, G2, B1, B2):
     V = list(G1.nodes())
+    V.sort()
     IG = induced_graph(V, B1, B2)
     IG_cleaned = IG_clean_up(IG, G1, G2, B2)
     unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
@@ -162,6 +164,7 @@ def plot_auxiliary(G1, G2, B1, B2):
 
 def st_plot_auxiliary(G1, G2, B1, B2):
     V = list(G1.nodes())
+    V.sort()
     IG = induced_graph(V, B1, B2)
     IG_cleaned = IG_clean_up(IG, G1, G2, B2)
     unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
@@ -193,11 +196,7 @@ def st_plot_auxiliary(G1, G2, B1, B2):
     ax.invert_yaxis()
     ax.margins(0.20)
     plt.close(fig)
-    result = is_vertex_cover(
-        IG_cleaned.edges,
-        unremovable_neighbors | unremovable
-    )
-    return fig, result
+    return fig
     
 def random_dag(n, p=0.3, seed=None):
     if seed is not None:
@@ -223,6 +222,7 @@ def random_confounding(n, k, seed=None):
 
 def is_good(G1, G2, B1, B2):
     V = list(G1.nodes())
+    V.sort()
     IG = induced_graph(V, B1, B2)
     removable, unremovable = get_removable(V,G1,G2,B2)
     remain = set(IG.nodes)-set(removable)
@@ -234,6 +234,7 @@ def is_good(G1, G2, B1, B2):
 
 def is_finished(G1, G2, B1, B2):
     V = list(G1.nodes())
+    V.sort()
     IG = induced_graph(V, B1, B2)
     removable, unremovable = get_removable(V,G1,G2,B2)
     remain = set(IG.nodes)-set(removable)
@@ -263,6 +264,62 @@ def estimate_good_probability(N, num_vertex, num_confounding):
             count_true += 1
     return count_true / N
 
+def plot_reduced(G1,G2,B1,B2):
+    V = list(G1.nodes())
+    V.sort()
+    IG = induced_graph(V, B1, B2)
+    IG_cleaned = IG_clean_up(IG, G1, G2, B2)
+    unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
+    unremovable_neighbors = neighbors_of_set(IG_cleaned, unremovable)
+
+    remain = IG_cleaned.nodes - unremovable - unremovable_neighbors
+    IG_remain = IG_cleaned.subgraph(remain).copy()
+    IG_remain.remove_nodes_from(list(nx.isolates(IG_remain)))
+
+    options = {
+    "font_size": 6,
+    "node_size": 500,
+    "edgecolors": "black",
+    "node_color": "white",
+    "linewidths": 1,
+    "width": 1,
+    }
+    pos = {(i, j): (j, i) for i, j in IG_remain.nodes()}
+    nx.draw_networkx(IG_remain, pos, arrows=True, **options, connectionstyle="arc3,rad=0.2")
+    plt.gca().invert_yaxis()
+    ax = plt.gca()
+    ax.margins(0.20)
+    plt.show()
+
+def st_plot_reduced(G1,G2,B1,B2):
+    V = list(G1.nodes())
+    V.sort()
+    IG = induced_graph(V, B1, B2)
+    IG_cleaned = IG_clean_up(IG, G1, G2, B2)
+    unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
+    unremovable_neighbors = neighbors_of_set(IG_cleaned, unremovable)
+
+    remain = IG_cleaned.nodes - unremovable - unremovable_neighbors
+    IG_remain = IG_cleaned.subgraph(remain).copy()
+    IG_remain.remove_nodes_from(list(nx.isolates(IG_remain)))
+
+    options = {
+    "font_size": 6,
+    "node_size": 500,
+    "edgecolors": "black",
+    "node_color": "white",
+    "linewidths": 1,
+    "width": 1,
+    }
+    pos = {(i, j): (j, i) for i, j in IG_remain.nodes()}
+    fig, ax = plt.subplots()
+    nx.draw_networkx(IG_remain, pos, arrows=True, ax=ax, **options, connectionstyle="arc3,rad=0.2")
+    ax.invert_yaxis()
+    ax.margins(0.20)
+    plt.close(fig)
+    return fig
+
+
 def find_not_good_pair(N, num_vertex, num_confounding):
     for _ in range(N):
         G1 = random_dag(num_vertex,random.random())
@@ -277,6 +334,7 @@ def get_j(S, i):
 
 def check_inclusion(G1,G2,B1,B2):
     V = list(G1.nodes())
+    V.sort()
     IG = induced_graph(V, B1, B2)
     IG_cleaned = IG_clean_up(IG, G1, G2, B2)
     unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
@@ -329,6 +387,7 @@ def check_inclusion_full(G1,G2,B1,B2):
         return False
     
     V = list(G1.nodes())
+    V.sort()
     IG = induced_graph(V, B1, B2)
     IG_cleaned = IG_clean_up(IG, G1, G2, B2)
     unremovable = get_removable(V, G1, G2, B2)[1] & IG_cleaned.nodes
@@ -358,6 +417,8 @@ def check_inclusion_full(G1,G2,B1,B2):
             X = list(get_j(unremovable_neighbors,i)) + list(get_j(cover,i))
             Y = list(G2.predecessors(i))
             if path_rank(G1, X, Y + [i]) != path_rank(G1, X, Y):
-                return False
-
-    return True
+                break
+        else:
+            return True
+            
+    return False
