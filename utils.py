@@ -92,6 +92,7 @@ def plot_induced(IG):
     plt.gca().invert_yaxis()
     ax = plt.gca()
     ax.margins(0.20)
+    ax.set_axis_off()
     plt.show()
 
 def trivial_row(V, edges):
@@ -159,8 +160,11 @@ def plot_auxiliary(G1, G2, B1, B2):
     plt.gca().invert_yaxis()
     ax = plt.gca()
     ax.margins(0.20)
+    ax.set_axis_off()
     plt.show()
-    return(is_vertex_cover(IG_cleaned.edges, unremovable_neighbors | unremovable))
+    if IG_cleaned.subgraph(unremovable).number_of_edges() > 0:
+        return True # Is tractable
+    return(is_vertex_cover(IG_cleaned.edges, unremovable_neighbors))
 
 def st_plot_auxiliary(G1, G2, B1, B2):
     V = list(G1.nodes())
@@ -289,6 +293,7 @@ def plot_reduced(G1,G2,B1,B2):
     plt.gca().invert_yaxis()
     ax = plt.gca()
     ax.margins(0.20)
+    ax.set_axis_off()
     plt.show()
 
 def st_plot_reduced(G1,G2,B1,B2):
@@ -381,6 +386,14 @@ def inclusive_minimal_covers(IG_remain,P):
             k = k+1
     return P
 
+def minimal_vertex_covers_fast(G):
+    H = nx.complement(G)
+    V = set(G.nodes())
+    for clique in nx.find_cliques(H):
+        independent_set = set(clique)
+
+        yield V - independent_set
+
 def check_inclusion_full(G1,G2,B1,B2):
 
     if len(B1) != len(B2):
@@ -402,17 +415,14 @@ def check_inclusion_full(G1,G2,B1,B2):
         if not path_rank(G1, X, Y + [i]) == path_rank(G1, X, Y):
             return False
     
-    if is_vertex_cover(IG_cleaned.edges, unremovable_neighbors | unremovable):
+    if is_vertex_cover(IG_cleaned.edges, unremovable_neighbors):
         return True
 
     remain = IG_cleaned.nodes - unremovable - unremovable_neighbors
     IG_remain = IG_cleaned.subgraph(remain).copy()
     IG_remain.remove_nodes_from(list(nx.isolates(IG_remain)))
 
-    P = powerset(IG_remain.nodes())
-    covers = inclusive_minimal_covers(IG_remain,P)
-    
-    for cover in covers:
+    for cover in minimal_vertex_covers_fast(IG_remain):
         for i in V:
             X = list(get_j(unremovable_neighbors,i)) + list(get_j(cover,i))
             Y = list(G2.predecessors(i))
