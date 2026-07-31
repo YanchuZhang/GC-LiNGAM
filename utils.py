@@ -1,7 +1,14 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import random
-from itertools import combinations
+from itertools import combinations, product
+from z3 import *
+import sympy as sp
+import numpy as np
+from fractions import Fraction
+import time
+import csv
+from collections import deque
 
 def is_vertex_cover(E, S):
     S = set(S)
@@ -432,3 +439,237 @@ def check_inclusion_full(G1,G2,B1,B2):
             return True
             
     return False
+
+def create_z3_variables(E):
+    return {
+        (u, v): Real(f"x_{u}_{v}")
+        for u, v in E
+    }
+
+def create_random_B(E, n):
+    L = sp.zeros(n, n)
+
+    for u, v in E:
+        # random rational number
+        numerator = random.randint(-1000, 1000)
+        denominator = random.randint(1, 1000)
+        L[u-1, v-1] = sp.Rational(numerator, denominator)
+
+    I = sp.eye(n)
+    return (I - L).inv().T
+
+def create_equation(i, j, n, x_vars, B):
+
+    expr = B[i-1,j-1]
+
+    for k in range(n):
+        if (k+1, i) in x_vars and B[k,j-1]!=0:
+            expr -= x_vars[(k+1, i)] * B[k,j-1]
+
+    return expr
+
+def create_variables(edge_list):
+    return {(u, v): sp.Symbol(f"m_{u}_{v}") for u, v in edge_list}
+
+
+def get_M_matrix(edge_list, n):
+    vars = create_variables(edge_list)
+    M = sp.zeros(n)
+
+    for (u, v), var in vars.items():
+        M[u-1, v-1] = var
+
+    return M, list(vars.values())
+
+def get_L_matrix(edge_list, n, low=-1.0, high=1.0):
+    L = np.zeros((n, n))
+
+    for u, v in edge_list:
+        L[u-1, v-1] = np.random.uniform(low, high)
+
+    return L
+
+def get_J(B2, n):
+    B2 = set(B2)
+    return [(i, j) for i in range(1, n+1)
+                   for j in range(i+1, n+1)
+                   if (i, j) not in B2]
+
+def get_K(B1, n):
+    symmetric_B1 = set(B1) | {(j, i) for i, j in B1}
+    return [(i, j)
+            for i in range(1, n+1)
+            for j in range(1, n+1)
+            if i == j or (i, j) in symmetric_B1]
+
+def map_pairs(JK):
+    return [((a, c), (b, d)) for ((a, b), (c, d)) in JK]
+
+def filter_pairs(JK, A):
+    return [((a, b), (c, d)) 
+            for ((a, b), (c, d)) in JK
+            if A[a-1, b-1] != 0 and A[c-1, d-1] != 0]
+
+def create_equations(JK, A):
+    return [
+        A[a-1, b-1] * A[c-1, d-1]
+        for ((a, b), (c, d)) in JK
+    ]
+
+def get_both_linear_equations(JK, A):
+    return [
+        [A[a-1, b-1] , A[c-1, d-1]]
+        for ((a, b), (c, d)) in JK
+    ]
+
+def get_solver(E1,E2,B1,B2,n):
+
+    L = get_L_matrix(E1, n)
+    M, vars = get_M_matrix(E2, n)
+    I = np.eye(n)
+    A = (I-M).T @ np.linalg.inv(I - L).T
+    J = get_J(B2,n)
+    K = get_K(B1,n)
+    JK = map_pairs(list(product(J,K)))
+    JK_reduced = filter_pairs(JK, A)
+    JK_reduced
+
+    constant_indices = [
+        (i+1, j+1)
+        for i in range(A.rows)
+        for j in range(A.cols)
+        if not (A[i, j].free_symbols & set(vars))
+    ]
+
+    x = create_z3_variables(E2)
+    B = create_random_B(E1, n)
+
+    s = Solver()
+
+    for (a,b),(c,d) in JK_reduced:
+
+        if (a,b) in constant_indices:
+            if (c,d) in constant_indices:
+                return False
+            else:
+                s.add(create_equation(c, d, n, x, B)==0)
+        elif (c,d) in constant_indices:
+            s.add(create_equation(a,b,n,x,B)==0)
+        else:    
+            f = create_equation(a, b, n, x, B)
+            g = create_equation(c, d, n, x, B)
+            b = Bool(f"choose_{(a,b,c,d)}")
+            s.add(If(b, f == 0, g == 0))
+
+    if s.check() == sat:
+        return True
+    else:
+        return False
+
+def canonical(edges):
+    """Convert edge list to hashable representation."""
+    return tuple(sorted(edges))
+
+
+def is_acyclic(edges):
+    """Check whether directed edge set is a DAG."""
+    G = nx.DiGraph()
+    G.add_edges_from(edges)
+    return nx.is_directed_acyclic_graph(G)
+
+
+def generate_neighbors(edges, n):
+    """
+    Generate all DAGs differing by one edge addition or removal.
+    """
+    edges = set(edges)
+    neighbors = []
+
+    for e in edges:
+        new_edges = edges.copy()
+        new_edges.remove(e)
+
+        neighbors.append(new_edges)
+
+    for u in range(1, n + 1):
+        for v in range(1, n + 1):
+
+            if u == v:
+                continue
+
+            if (u, v) in edges:
+                continue
+
+            new_edges = edges.copy()
+            new_edges.add((u, v))
+
+            if is_acyclic(new_edges):
+                neighbors.append(new_edges)
+
+    return neighbors
+
+
+def find_equivalence_class_meek(edges, confounding, n):
+    # Assume meek conjecture holds
+    # Fixing confounding
+    start = set(edges)
+    visited = {canonical(start)}
+    result = [start]
+    queue = deque([start])
+    while queue:
+        current = queue.popleft()
+        for neighbor in generate_neighbors(current, n):
+            key = canonical(neighbor)
+            if key in visited:
+                continue
+            G1 = nx.DiGraph()
+            G2 = nx.DiGraph()
+            V = range(1,n+1)
+            G1.add_nodes_from(V)
+            G2.add_nodes_from(V)
+            G1.add_edges_from(start)
+            G2.add_edges_from(neighbor)
+            if check_inclusion_full(G1, G2, confounding, confounding) and check_inclusion_full(G2, G1, confounding, confounding):
+                visited.add(key)
+                result.append(neighbor)
+                queue.append(neighbor)
+    return result
+
+def enumerate_dags(n):
+    vertices = range(1, n + 1)
+
+    edges = [(u, v)
+             for u in vertices
+             for v in vertices
+             if u != v]
+
+    G = nx.DiGraph()
+    G.add_nodes_from(vertices)
+
+    def dfs(i):
+        if i == len(edges):
+            yield G.copy()
+            return
+
+        yield from dfs(i + 1)
+
+        u, v = edges[i]
+        if not nx.has_path(G, v, u):
+            G.add_edge(u, v)
+            yield from dfs(i + 1)
+            G.remove_edge(u, v)
+
+    yield from dfs(0)
+
+def find_equivalent_graphs_exhaustive(E,B,n):
+    # Exhaustive search fixing bidirected part
+    # n should not be larger than 5
+    print ("Confounding:")
+    print (B)
+    print ("---Edges---")
+    G1 = nx.DiGraph()
+    G1.add_nodes_from(range(1,n+1))
+    G1.add_edges_from(E)
+    for G in enumerate_dags(n):
+        if check_inclusion_full(G1,G,B,B) and check_inclusion_full(G,G1,B,B):
+            print (G.edges())
