@@ -673,3 +673,18 @@ def find_equivalent_graphs_exhaustive(E,B,n):
     for G in enumerate_dags(n):
         if check_inclusion_full(G1,G,B,B) and check_inclusion_full(G,G1,B,B):
             print (G.edges())
+
+
+def find_equivalent_graphs_exhaustive_to_compare(E,B,n):
+    # Exhaustive search fixing bidirected part
+    # n should not be larger than 5
+    G1 = nx.DiGraph()
+    G1.add_nodes_from(range(1,n+1))
+    G1.add_edges_from(E)
+    result = []
+    for G in enumerate_dags(n):
+        if check_inclusion_full(G1,G,B,B) and check_inclusion_full(G,G1,B,B):
+            result.append(set(G.edges()))
+
+    return result
+    
