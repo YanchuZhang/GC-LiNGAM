@@ -1,0 +1,5 @@
+networkx
+matplotlib
+z3-solver
+sympy
+numpy
