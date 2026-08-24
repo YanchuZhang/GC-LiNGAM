@@ -1,6 +1,6 @@
 # Model Equivalence in Linear Non-Gaussain Causal Models Under General Confounding
 
-This repository contains the code accompanying my master's thesis, *"Model Equivalence in Linear Non-Gaussain Causal Models Under General Confounding"*.
+This repository contains the code accompanying my master's thesis, *"Model Equivalence in Linear Non-Gaussian Causal Models Under General Confounding"*.
 
 
 ## Repository Structure
@@ -9,7 +9,7 @@ This repository contains the code accompanying my master's thesis, *"Model Equiv
 .
 ├── utils.py                        # Main graphical tools for checking equivalence
 ├── z3_solver.ipynb                 # SMT based approach
-├── meek.ipynb                      # Meek conjecture testing
+├── traversal.ipynb                 # Traversal analysis
 ├── reversal.ipynb                  # Reversal conjecture testing
 ├── demo_graphical_methods.ipynb    # Demo of the proposed graphical method
 ├── data/                           # Performance testing
@@ -69,7 +69,7 @@ Finally, we determine model inclusion using `check_inclusion_full(G1, G2, B1, B2
 * To generate a random DAG, run `random_dag(n, p)`, where $p$ is the edge density
 * To generate random confounding, run `random_confounding(n, k)`, where $k$ is the number of bidirected edges
 * Enumerate inclusive minimal vertex covers using `minimal_vertex_covers_fast(G)`
-* To find model-equivalent graphs using DFS/BFS, run `find_equivalence_class_meek(E,B,n)`. This does not always return the entire equivalence class, but it is very fast for listing all equivalent graphs connected in the Hasse diagram.
+* To find model-equivalent graphs using DFS/BFS, run `find_equivalence_class_traversal(E,B,n)`. This does not always return the entire equivalence class, but it is very fast for listing all equivalent graphs connected in the Hasse diagram.
 * To find model equivalent graphs by exhaustive search, run `find_equivalent_graphs_exhaustive(E,B,n)`. This is not suitable for $n > 5$.
 
 ### 3. SMT-based Methods

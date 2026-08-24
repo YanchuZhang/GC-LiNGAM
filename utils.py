@@ -609,8 +609,8 @@ def generate_neighbors(edges, n):
     return neighbors
 
 
-def find_equivalence_class_meek(edges, confounding, n):
-    # Assume meek conjecture holds
+def find_equivalence_class_traversal(edges, confounding, n):
+    # Searching for equivalent graphs by adding/removing edges
     # Fixing confounding
     start = set(edges)
     visited = {canonical(start)}
